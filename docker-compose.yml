@@ -1,0 +1,52 @@
+version: '3'
+services:
+  broker:
+    image: eclipse-mosquitto:latest
+    ports:
+      - "2883:2883"
+    volumes: 
+        - ./mosquitto:/mosquitto/config
+    networks:
+      - my_network
+
+  sensor-publisher:
+    build: ./sensor_publisher
+    depends_on:
+      - broker
+    networks:
+      - my_network
+
+  sensor-subscriber:
+    build: ./sensor_subscriber
+    depends_on:
+      - broker
+      - mongodb
+      - redis
+    networks:
+      - my_network
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27018:27018"
+    networks:
+      - my_network
+
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - my_network
+
+  fastapi-app:
+    build: ./fastapi_app
+    depends_on:
+      - mongodb
+      - redis
+    ports:
+      - "8000:80"
+    networks:
+      - my_network
+networks:
+  my_network:
