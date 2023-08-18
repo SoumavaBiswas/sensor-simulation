@@ -1,42 +1,40 @@
 import json
-import logging
 from datetime import datetime, timedelta
 
+from conn.mongo_connection import get_mongo_collection
+from conn.redis_connection import get_redis_client
 from fastapi import FastAPI
-from pymongo import MongoClient
-from redis import StrictRedis
+from util.utils import datetime_format, is_valid_datetime
 
 app = FastAPI()
 
-# MongoDB setup
-try:
-    mongo_client = MongoClient(
-        "mongodb://sensor-simulation-mongodb-1/sensor_data")
-except:
-    logging.exception("Mongo is not connected successfully.")
-finally:
-    logging.info("Mongo is successfully connected.")
-    db = mongo_client["sensor_data"]
-    collection = db["readings"]
-
-# Redis setup
-redis_client = StrictRedis(host="redis", port=6379, decode_responses=True)
+collection = get_mongo_collection()
+redis_client = get_redis_client()
 
 
 @app.get("/sensor_readings")
 def get_sensor_readings(start: str = None, end: str = None):
+
+    # If no start time and end time are provided,
+    # the endpoint will retrieve sensor data from the last hour.
     if not end:
-        end = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        end = datetime.utcnow().strftime(datetime_format)
     if not start:
         start = (datetime.utcnow() - timedelta(hours=1)
-                 ).strftime('%Y-%m-%dT%H:%M:%SZ')
+                 ).strftime(datetime_format)
 
-    start_time = start
-    end_time = end
-    query = {"timestamp": {"$gte": start_time, "$lte": end_time}}
-    data = list(collection.find(query))
-    for doc in data:
-        doc["_id"] = str(doc["_id"])
+    # If the provided start and end values are not in a valid datetime format (TZ format),
+    # a dictionary containing an error message will be returned."
+    if is_valid_datetime(start) and is_valid_datetime(end):
+        query = {"timestamp": {"$gte": start, "$lte": end}}
+        if collection is not None:
+            data = list(collection.find(query))
+            for doc in data:
+                doc["_id"] = str(doc["_id"])
+        else:
+            data = []
+    else:
+        data = {"detail": "Invalid datetime format. Please provide in TZ format"}
     return data
 
 

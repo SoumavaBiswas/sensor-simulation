@@ -20,12 +20,12 @@ redis_client = StrictRedis(host="redis", port=6379, decode_responses=True)
 def on_message(client, userdata, msg):
     payload = json.loads(msg.payload)
     collection.insert_one(payload)
-    # Update the latest readings in Redis
     sensor_id = payload["sensor_id"]
 
     # Convert ObjectId to string before inserting into Redis
     payload["_id"] = str(payload["_id"])
 
+    # Update the latest readings in Redis
     redis_client.lpush(sensor_id, json.dumps(payload))
     redis_client.ltrim(sensor_id, 0, 9)  # Keep only the latest 10 readings
 
